@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"net/http"
 	"github.com/gorilla/websocket"
-	ws"github.com/puedesleerlo/emma-go/websockets"
+    ws"github.com/puedesleerlo/emma-go/websockets"
+    "github.com/puedesleerlo/emma-go/programs"
 	)
 
 func main() {
     fmt.Println("Starting application...")
-    ws.ManagerStart()
+    notebookMsg := ws.Message{Type: "notebook", Content: programs.GetPrograms()}
+    ws.ManagerStart(notebookMsg)
     http.HandleFunc("/ws", wsPage)
     http.ListenAndServe(":8886", nil)
 }
@@ -20,6 +22,6 @@ func wsPage(res http.ResponseWriter, req *http.Request) {
         http.NotFound(res, req)
         return
 	}
-	ws.ClientStart(conn)
+	ws.ClientStart(conn, programs.SaveEdited)
    
 }

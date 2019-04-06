@@ -14,16 +14,19 @@ type ClientManager struct {
 type Message struct {
     Sender    string `json:"sender,omitempty"`
     Recipient string `json:"recipient,omitempty"`
-    Content   string `json:"content,omitempty"`
+    Type     string `json:"type,omitempty"`
+    Content   interface{} `json:"content,omitempty"`
 }
 
-func (manager *ClientManager) start() {
+func (manager *ClientManager) start(openmsg interface{}) {
     for {
         select {
         case conn := <-manager.register:
             manager.clients[conn] = true
-            jsonMessage, _ := json.Marshal(&Message{Content: "/A new socket has connected."})
-            manager.send(jsonMessage, conn)
+            jsonMessage, _ := json.Marshal(openmsg)
+            openMessage, _ := json.Marshal(&Message{Content: "/A socket has disconnected."})
+            manager.sendTo(jsonMessage, conn)
+            manager.send(openMessage, conn)
         case conn := <-manager.unregister:
             if _, ok := manager.clients[conn]; ok {
                 close(conn.send)
@@ -51,4 +54,6 @@ func (manager *ClientManager) send(message []byte, ignore *Client) {
         }
     }
 }
-
+func (manager *ClientManager) sendTo(message []byte, client *Client) {
+    client.send <- message
+}

@@ -1,6 +1,8 @@
 package websockets
 
 import (
+    "log"
+    "time"
 	"encoding/json"
 	"github.com/gorilla/websocket"
 	"github.com/satori/go.uuid"
@@ -12,7 +14,7 @@ type Client struct {
 	send   chan []byte
 }
 
-func (c *Client) read() {
+func (c *Client) read(callback func(interface{})) {
     defer func() {
         manager.unregister <- c
         c.socket.Close()
@@ -21,17 +23,28 @@ func (c *Client) read() {
     for {
         _, message, err := c.socket.ReadMessage()
         if err != nil {
+            // log.Fatalf("la conexión ha sido cerrada %v", err)
             manager.unregister <- c
             c.socket.Close()
             break
         }
-        jsonMessage, _ := json.Marshal(&Message{Sender: c.id, Content: string(message)})
+        compiledMessage := ProcessMessage(message)
+        jsonMessage, _ := json.Marshal(&Message{Sender: c.id,
+             Type: compiledMessage.Type, 
+             Content: compiledMessage.Content,
+            })
+        callback(compiledMessage.Content)
+        //Aquí faltan los efectos colaterales, que en este caso sería la edición de los archivos, habría que hacer
+        //un unmarshal, ver el tipo de evento que se mandó y actuar en consecuencia
+        
+        
         manager.broadcast <- jsonMessage
     }
 }
 
 func (c *Client) write() {
     defer func() {
+        // log.Fatalf("la conexión ha sido cerrada")
         c.socket.Close()
     }()
 
@@ -48,12 +61,23 @@ func (c *Client) write() {
     }
 }
 
-func ClientStart(conn *websocket.Conn) {
-	id, _ := uuid.NewV4()
+func ClientStart(conn *websocket.Conn, readCallback func(interface{})) {
+    id, _ := uuid.NewV4()
+    conn.SetReadDeadline(time.Time{})
+    conn.SetWriteDeadline(time.Time{})
 	client := &Client{id: id.String(), socket: conn, send: make(chan []byte)}
 
     manager.register <- client
 
-    go client.read()
+    go client.read(readCallback)
     go client.write()
+}
+
+func ProcessMessage(data []byte) Message{
+    message := Message{}
+    err := json.Unmarshal(data, &message)
+    if err != nil {
+        log.Fatalf("Este no es el mensaje!!")
+    }
+    return message
 }
