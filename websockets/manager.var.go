@@ -7,6 +7,6 @@ var manager = ClientManager{
     clients:    make(map[*Client]bool),
 }
 
-func ManagerStart(openmsg interface{}) {
+func ManagerStart(openmsg func()interface{}) {
 	go manager.start(openmsg)
 }

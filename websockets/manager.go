@@ -1,7 +1,7 @@
 package websockets
 
 import (
-	"encoding/json"
+    "encoding/json"
 	)
 
 type ClientManager struct {
@@ -15,23 +15,29 @@ type Message struct {
     Sender    string `json:"sender,omitempty"`
     Recipient string `json:"recipient,omitempty"`
     Type     string `json:"type,omitempty"`
-    Content   interface{} `json:"content,omitempty"`
+    Content   map[string]interface{} `json:"content,omitempty"`
 }
 
-func (manager *ClientManager) start(openmsg interface{}) {
+func (manager *ClientManager) start(openmsg func()interface{}) {
     for {
         select {
         case conn := <-manager.register:
             manager.clients[conn] = true
-            jsonMessage, _ := json.Marshal(openmsg)
-            openMessage, _ := json.Marshal(&Message{Content: "/A socket has disconnected."})
+            notebookMsg := Message{Type: "notebook"} //Esto habría que quitarlo luego
+            notebookMsg.SetContent(openmsg())
+            jsonMessage, _ := json.Marshal(notebookMsg)
+            message := Message{}
+            message.SetContent("/A socket has connected.")
+            openMessage, _ := json.Marshal(&message)
             manager.sendTo(jsonMessage, conn)
             manager.send(openMessage, conn)
         case conn := <-manager.unregister:
             if _, ok := manager.clients[conn]; ok {
                 close(conn.send)
                 delete(manager.clients, conn)
-                jsonMessage, _ := json.Marshal(&Message{Content: "/A socket has disconnected."})
+                message := Message{}
+                message.SetContent("/A socket has disconnected.")
+                jsonMessage, _ := json.Marshal(&message)
                 manager.send(jsonMessage, conn)
             }
         case message := <-manager.broadcast:
@@ -56,4 +62,10 @@ func (manager *ClientManager) send(message []byte, ignore *Client) {
 }
 func (manager *ClientManager) sendTo(message []byte, client *Client) {
     client.send <- message
+}
+
+func (message *Message) SetContent(content interface{}) {
+    m := make(map[string]interface{})
+    m["msg"] = content
+    message.Content = m
 }
